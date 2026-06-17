@@ -74,6 +74,33 @@ app.post("/set", (req, res) => {
 });
 
 // --------------------
+// REMOVE PLAYER (NEW)
+// --------------------
+app.post("/remove", (req, res) => {
+    const { player } = req.body;
+
+    if (!player) {
+        return res.json({ success: false, error: "Missing player" });
+    }
+
+    let data = load();
+
+    if (!data[player]) {
+        return res.json({ success: false, error: "Player not found" });
+    }
+
+    delete data[player];
+
+    save(data);
+
+    res.json({
+        success: true,
+        message: "Player removed",
+        player
+    });
+});
+
+// --------------------
 // START SERVER
 // --------------------
 const PORT = process.env.PORT || 3000;
