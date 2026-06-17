@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
 app.use(express.json());
@@ -18,7 +19,6 @@ function load() {
             fs.writeFileSync(FILE, "{}");
             return {};
         }
-
         const raw = fs.readFileSync(FILE, "utf8");
         return JSON.parse(raw || "{}");
     } catch (err) {
@@ -36,11 +36,64 @@ function save(data) {
 }
 
 // =====================
+// TOKEN STORE
+// (in-memory, resets on redeploy — that's fine)
+// =====================
+
+const validTokens = new Set();
+
+// =====================
+// AUTH MIDDLEWARE
+// =====================
+
+function requireAuth(req, res, next) {
+    const token = req.headers["x-admin-token"];
+    if (!token || !validTokens.has(token)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    next();
+}
+
+// =====================
 // HEALTH CHECK
 // =====================
 
 app.get("/", (req, res) => {
     res.send("SonarMC Tier API is running ^^");
+});
+
+// =====================
+// LOGIN
+// =====================
+
+app.post("/login", (req, res) => {
+    const { password } = req.body;
+
+    const correct = process.env.ADMIN_PASSWORD;
+
+    if (!correct) {
+        return res.status(500).json({ success: false, error: "ADMIN_PASSWORD not set on server." });
+    }
+
+    if (password !== correct) {
+        return res.status(401).json({ success: false, error: "Wrong password." });
+    }
+
+    // Generate a random token
+    const token = crypto.randomBytes(32).toString("hex");
+    validTokens.add(token);
+
+    return res.json({ success: true, token });
+});
+
+// =====================
+// LOGOUT
+// =====================
+
+app.post("/logout", requireAuth, (req, res) => {
+    const token = req.headers["x-admin-token"];
+    validTokens.delete(token);
+    res.json({ success: true });
 });
 
 // =====================
@@ -57,10 +110,10 @@ app.get("/players", (req, res) => {
 });
 
 // =====================
-// SET PLAYER
+// SET PLAYER (protected)
 // =====================
 
-app.post("/set", (req, res) => {
+app.post("/set", requireAuth, (req, res) => {
     const { player, kit, rank } = req.body;
 
     if (!player || !kit || !rank) {
@@ -91,23 +144,16 @@ app.post("/set", (req, res) => {
     }
 
     data[player][kit] = rank;
-
     save(data);
 
-    return res.json({
-        success: true,
-        message: "Updated",
-        player,
-        kit,
-        rank
-    });
+    return res.json({ success: true, message: "Updated", player, kit, rank });
 });
 
 // =====================
-// REMOVE PLAYER
+// REMOVE PLAYER (protected)
 // =====================
 
-app.post("/remove", (req, res) => {
+app.post("/remove", requireAuth, (req, res) => {
     const { player } = req.body;
 
     if (!player) {
@@ -123,11 +169,7 @@ app.post("/remove", (req, res) => {
     delete data[player];
     save(data);
 
-    return res.json({
-        success: true,
-        message: "Removed",
-        player
-    });
+    return res.json({ success: true, message: "Removed", player });
 });
 
 // =====================
