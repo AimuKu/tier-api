@@ -9,8 +9,23 @@ app.use(cors());
 const FILE = "players.json";
 
 // =====================
+// DEFAULT PLAYER
+// =====================
+
+function defaultPlayer() {
+    return {
+        sword: null,
+        axe: null,
+        spearMace: null,
+        elytraMace: null,
+        crystal: null
+    };
+}
+
+// =====================
 // FILE HELPERS
 // =====================
+
 function load() {
     try {
         if (!fs.existsSync(FILE)) {
@@ -37,27 +52,22 @@ function save(data) {
 // =====================
 // GET PLAYERS
 // =====================
+
 app.get("/players", (req, res) => {
     const data = load();
 
-    // normalize structure (VERY IMPORTANT FIX)
+    // ensure no broken players
     for (const key in data) {
-        data[key] = {
-            sword: null,
-            axe: null,
-            spearMace: null,
-            elytraMace: null,
-            crystal: null,
-            ...data[key]
-        };
+        data[key] = { ...defaultPlayer(), ...data[key] };
     }
 
     res.json(data);
 });
 
 // =====================
-// SET PLAYER KIT
+// SET PLAYER TIER
 // =====================
+
 app.post("/set", (req, res) => {
     const { player, kit, rank } = req.body;
 
@@ -65,7 +75,7 @@ app.post("/set", (req, res) => {
         return res.json({ success: false, error: "Missing fields" });
     }
 
-    const validKits = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
+    const validKits = Object.keys(defaultPlayer());
     const validRanks = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
 
     if (!validKits.includes(kit)) {
@@ -79,13 +89,7 @@ app.post("/set", (req, res) => {
     const data = load();
 
     if (!data[player]) {
-        data[player] = {
-            sword: null,
-            axe: null,
-            spearMace: null,
-            elytraMace: null,
-            crystal: null
-        };
+        data[player] = defaultPlayer();
     }
 
     data[player][kit] = rank;
@@ -103,6 +107,7 @@ app.post("/set", (req, res) => {
 // =====================
 // REMOVE PLAYER
 // =====================
+
 app.post("/remove", (req, res) => {
     const { player } = req.body;
 
@@ -113,7 +118,7 @@ app.post("/remove", (req, res) => {
     const data = load();
 
     if (!data[player]) {
-        return res.json({ success: false, error: "Player not found" });
+        return res.json({ success: false, error: "Not found" });
     }
 
     delete data[player];
@@ -127,17 +132,19 @@ app.post("/remove", (req, res) => {
 });
 
 // =====================
-// HEALTH CHECK
+// HEALTH
 // =====================
+
 app.get("/", (req, res) => {
-    res.send("SonarMC Tier API running ^^");
+    res.send("Tier API running ^^");
 });
 
 // =====================
 // START
 // =====================
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+    console.log("Server running on port", PORT);
 });
