@@ -11,7 +11,6 @@ const FILE = "players.json";
 // =====================
 // FILE HELPERS
 // =====================
-
 function load() {
     try {
         if (!fs.existsSync(FILE)) {
@@ -36,45 +35,45 @@ function save(data) {
 }
 
 // =====================
-// GET PLAYERS (FRONTEND)
+// GET PLAYERS
 // =====================
-
 app.get("/players", (req, res) => {
     const data = load();
+
+    // normalize structure (VERY IMPORTANT FIX)
+    for (const key in data) {
+        data[key] = {
+            sword: null,
+            axe: null,
+            spearMace: null,
+            elytraMace: null,
+            crystal: null,
+            ...data[key]
+        };
+    }
+
     res.json(data);
 });
 
 // =====================
-// SET / UPDATE PLAYER (DISCORD BOT)
+// SET PLAYER KIT
 // =====================
-
 app.post("/set", (req, res) => {
     const { player, kit, rank } = req.body;
 
-    console.log("SET REQUEST:", req.body);
-
     if (!player || !kit || !rank) {
-        return res.json({
-            success: false,
-            error: "Missing fields"
-        });
+        return res.json({ success: false, error: "Missing fields" });
     }
 
     const validKits = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
     const validRanks = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
 
     if (!validKits.includes(kit)) {
-        return res.json({
-            success: false,
-            error: "Invalid kit"
-        });
+        return res.json({ success: false, error: "Invalid kit" });
     }
 
     if (!validRanks.includes(rank)) {
-        return res.json({
-            success: false,
-            error: "Invalid rank"
-        });
+        return res.json({ success: false, error: "Invalid rank" });
     }
 
     const data = load();
@@ -93,9 +92,8 @@ app.post("/set", (req, res) => {
 
     save(data);
 
-    return res.json({
+    res.json({
         success: true,
-        message: "Player updated",
         player,
         kit,
         rank
@@ -105,35 +103,25 @@ app.post("/set", (req, res) => {
 // =====================
 // REMOVE PLAYER
 // =====================
-
 app.post("/remove", (req, res) => {
     const { player } = req.body;
 
-    console.log("REMOVE REQUEST:", req.body);
-
     if (!player) {
-        return res.json({
-            success: false,
-            error: "Missing player"
-        });
+        return res.json({ success: false, error: "Missing player" });
     }
 
     const data = load();
 
     if (!data[player]) {
-        return res.json({
-            success: false,
-            error: "Player not found"
-        });
+        return res.json({ success: false, error: "Player not found" });
     }
 
     delete data[player];
 
     save(data);
 
-    return res.json({
+    res.json({
         success: true,
-        message: "Player removed",
         player
     });
 });
@@ -141,15 +129,13 @@ app.post("/remove", (req, res) => {
 // =====================
 // HEALTH CHECK
 // =====================
-
 app.get("/", (req, res) => {
-    res.send("SonarMC Tier API is running ^^");
+    res.send("SonarMC Tier API running ^^");
 });
 
 // =====================
-// START SERVER
+// START
 // =====================
-
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
