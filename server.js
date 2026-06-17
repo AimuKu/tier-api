@@ -6,7 +6,13 @@ const crypto = require("crypto");
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: "https://aimuku.github.io",
+    origin: (origin, callback) => {
+        if (!origin || origin.endsWith(".github.io") || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
     methods: ["GET", "POST"]
 }));
 
@@ -183,3 +189,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log("Server running on port " + PORT);
 });
+
