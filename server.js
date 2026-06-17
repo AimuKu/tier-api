@@ -8,44 +8,79 @@ app.use(cors());
 
 const FILE = "players.json";
 
+// =====================
+// FILE HELPERS
+// =====================
+
 function load() {
-    if (!fs.existsSync(FILE)) return {};
-    return JSON.parse(fs.readFileSync(FILE, "utf8"));
+    try {
+        if (!fs.existsSync(FILE)) {
+            fs.writeFileSync(FILE, "{}");
+            return {};
+        }
+
+        const raw = fs.readFileSync(FILE, "utf8");
+        return JSON.parse(raw || "{}");
+    } catch (err) {
+        console.error("LOAD ERROR:", err);
+        return {};
+    }
 }
 
 function save(data) {
-    fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
+    try {
+        fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error("SAVE ERROR:", err);
+    }
 }
 
-function findPlayerKey(data, name) {
-    if (!name) return null;
-    if (data[name]) return name;
+// =====================
+// GET PLAYERS (FRONTEND)
+// =====================
 
-    const lower = name.toLowerCase();
-    return Object.keys(data).find(key => key.toLowerCase() === lower) || null;
-}
+app.get("/players", (req, res) => {
+    const data = load();
+    res.json(data);
+});
 
-const VALID_KITS = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
-const VALID_RANKS = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
+// =====================
+// SET / UPDATE PLAYER (DISCORD BOT)
+// =====================
 
-function setTier(player, kit, rank) {
+app.post("/set", (req, res) => {
+    const { player, kit, rank } = req.body;
+
+    console.log("SET REQUEST:", req.body);
+
     if (!player || !kit || !rank) {
-        return { success: false, error: "Missing fields" };
+        return res.json({
+            success: false,
+            error: "Missing fields"
+        });
     }
 
-    if (!VALID_KITS.includes(kit)) {
-        return { success: false, error: "Invalid kit" };
+    const validKits = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
+    const validRanks = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
+
+    if (!validKits.includes(kit)) {
+        return res.json({
+            success: false,
+            error: "Invalid kit"
+        });
     }
 
-    if (!VALID_RANKS.includes(rank)) {
-        return { success: false, error: "Invalid rank" };
+    if (!validRanks.includes(rank)) {
+        return res.json({
+            success: false,
+            error: "Invalid rank"
+        });
     }
 
     const data = load();
-    const key = findPlayerKey(data, player) || player;
 
-    if (!data[key]) {
-        data[key] = {
+    if (!data[player]) {
+        data[player] = {
             sword: null,
             axe: null,
             spearMace: null,
@@ -54,64 +89,69 @@ function setTier(player, kit, rank) {
         };
     }
 
-    data[key][kit] = rank;
+    data[player][kit] = rank;
+
     save(data);
 
-    return {
+    return res.json({
         success: true,
-        message: "Updated",
-        player: key,
+        message: "Player updated",
+        player,
         kit,
         rank
-    };
-}
-
-function removeTierPlayer(player) {
-    if (!player) {
-        return { success: false, error: "Missing player" };
-    }
-
-    const data = load();
-    const key = findPlayerKey(data, player);
-
-    if (!key) {
-        return { success: false, error: "Player not found" };
-    }
-
-    delete data[key];
-    save(data);
-
-    return {
-        success: true,
-        message: "Player removed",
-        player: key
-    };
-}
-
-app.get("/players", (req, res) => {
-    res.json(load());
+    });
 });
 
-app.get("/health", (req, res) => {
-    res.json({ ok: true });
-});
-
-// Discord bot + older clients
-app.post("/update", (req, res) => {
-    const { player, kit, rank } = req.body;
-    res.json(setTier(player, kit, rank));
-});
-
-// Alternate name used in some frontend docs
-app.post("/set", (req, res) => {
-    const { player, kit, rank } = req.body;
-    res.json(setTier(player, kit, rank));
-});
+// =====================
+// REMOVE PLAYER
+// =====================
 
 app.post("/remove", (req, res) => {
     const { player } = req.body;
-    res.json(removeTierPlayer(player));
+
+    console.log("REMOVE REQUEST:", req.body);
+
+    if (!player) {
+        return res.json({
+            success: false,
+            error: "Missing player"
+        });
+    }
+
+    const data = load();
+
+    if (!data[player]) {
+        return res.json({
+            success: false,
+            error: "Player not found"
+        });
+    }
+
+    delete data[player];
+
+    save(data);
+
+    return res.json({
+        success: true,
+        message: "Player removed",
+        player
+    });
 });
 
+// =====================
+// HEALTH CHECK
+// =====================
+
+app.get("/", (req, res) => {
+    res.send("SonarMC Tier API is running ^^");
+});
+
+// =====================
+// START SERVER
+// =====================
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port " + PORT));
+
+app.listen(PORT, () => {
+    console.log("Server running on port " + PORT);
+});
