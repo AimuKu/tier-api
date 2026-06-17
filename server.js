@@ -9,20 +9,6 @@ app.use(cors());
 const FILE = "players.json";
 
 // =====================
-// DEFAULT PLAYER
-// =====================
-
-function defaultPlayer() {
-    return {
-        sword: null,
-        axe: null,
-        spearMace: null,
-        elytraMace: null,
-        crystal: null
-    };
-}
-
-// =====================
 // FILE HELPERS
 // =====================
 
@@ -50,22 +36,28 @@ function save(data) {
 }
 
 // =====================
+// HEALTH CHECK
+// =====================
+
+app.get("/", (req, res) => {
+    res.send("SonarMC Tier API is running ^^");
+});
+
+// =====================
 // GET PLAYERS
 // =====================
 
 app.get("/players", (req, res) => {
-    const data = load();
-
-    // ensure no broken players
-    for (const key in data) {
-        data[key] = { ...defaultPlayer(), ...data[key] };
+    try {
+        res.setHeader("Content-Type", "application/json");
+        res.json(load());
+    } catch (err) {
+        res.status(500).json({});
     }
-
-    res.json(data);
 });
 
 // =====================
-// SET PLAYER TIER
+// SET PLAYER
 // =====================
 
 app.post("/set", (req, res) => {
@@ -75,7 +67,7 @@ app.post("/set", (req, res) => {
         return res.json({ success: false, error: "Missing fields" });
     }
 
-    const validKits = Object.keys(defaultPlayer());
+    const validKits = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
     const validRanks = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
 
     if (!validKits.includes(kit)) {
@@ -89,15 +81,22 @@ app.post("/set", (req, res) => {
     const data = load();
 
     if (!data[player]) {
-        data[player] = defaultPlayer();
+        data[player] = {
+            sword: null,
+            axe: null,
+            spearMace: null,
+            elytraMace: null,
+            crystal: null
+        };
     }
 
     data[player][kit] = rank;
 
     save(data);
 
-    res.json({
+    return res.json({
         success: true,
+        message: "Updated",
         player,
         kit,
         rank
@@ -118,33 +117,24 @@ app.post("/remove", (req, res) => {
     const data = load();
 
     if (!data[player]) {
-        return res.json({ success: false, error: "Not found" });
+        return res.json({ success: false, error: "Player not found" });
     }
 
     delete data[player];
-
     save(data);
 
-    res.json({
+    return res.json({
         success: true,
+        message: "Removed",
         player
     });
 });
 
 // =====================
-// HEALTH
-// =====================
-
-app.get("/", (req, res) => {
-    res.send("Tier API running ^^");
-});
-
-// =====================
-// START
+// START SERVER
 // =====================
 
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-    console.log("Server running on port", PORT);
+    console.log("Server running on port " + PORT);
 });
