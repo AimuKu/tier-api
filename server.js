@@ -5,7 +5,10 @@ const crypto = require("crypto");
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: "https://aimuku.github.io",
+    methods: ["GET", "POST"]
+}));
 
 const FILE = "players.json";
 
