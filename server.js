@@ -8,50 +8,44 @@ app.use(cors());
 
 const FILE = "players.json";
 
-// --------------------
-// LOAD / SAVE
-// --------------------
 function load() {
     if (!fs.existsSync(FILE)) return {};
-    return JSON.parse(fs.readFileSync(FILE));
+    return JSON.parse(fs.readFileSync(FILE, "utf8"));
 }
 
 function save(data) {
     fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
 }
 
-// --------------------
-// GET PLAYERS (frontend)
-// --------------------
-app.get("/players", (req, res) => {
-    res.json(load());
-});
+function findPlayerKey(data, name) {
+    if (!name) return null;
+    if (data[name]) return name;
 
-// --------------------
-// SET TIER (Discord bot)
-// --------------------
-app.post("/set", (req, res) => {
-    const { player, kit, rank } = req.body;
+    const lower = name.toLowerCase();
+    return Object.keys(data).find(key => key.toLowerCase() === lower) || null;
+}
 
+const VALID_KITS = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
+const VALID_RANKS = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
+
+function setTier(player, kit, rank) {
     if (!player || !kit || !rank) {
-        return res.json({ success: false, error: "Missing fields" });
+        return { success: false, error: "Missing fields" };
     }
 
-    const validKits = ["sword", "axe", "spearMace", "elytraMace", "crystal"];
-    const validRanks = ["HT1", "HT2", "HT3", "LT1", "LT2", "LT3"];
-
-    if (!validKits.includes(kit)) {
-        return res.json({ success: false, error: "Invalid kit" });
+    if (!VALID_KITS.includes(kit)) {
+        return { success: false, error: "Invalid kit" };
     }
 
-    if (!validRanks.includes(rank)) {
-        return res.json({ success: false, error: "Invalid rank" });
+    if (!VALID_RANKS.includes(rank)) {
+        return { success: false, error: "Invalid rank" };
     }
 
-    let data = load();
+    const data = load();
+    const key = findPlayerKey(data, player) || player;
 
-    if (!data[player]) {
-        data[player] = {
+    if (!data[key]) {
+        data[key] = {
             sword: null,
             axe: null,
             spearMace: null,
@@ -60,48 +54,64 @@ app.post("/set", (req, res) => {
         };
     }
 
-    data[player][kit] = rank;
-
+    data[key][kit] = rank;
     save(data);
 
-    res.json({
+    return {
         success: true,
         message: "Updated",
-        player,
+        player: key,
         kit,
         rank
-    });
-});
+    };
+}
 
-// --------------------
-// REMOVE PLAYER (NEW)
-// --------------------
-app.post("/remove", (req, res) => {
-    const { player } = req.body;
-
+function removeTierPlayer(player) {
     if (!player) {
-        return res.json({ success: false, error: "Missing player" });
+        return { success: false, error: "Missing player" };
     }
 
-    let data = load();
+    const data = load();
+    const key = findPlayerKey(data, player);
 
-    if (!data[player]) {
-        return res.json({ success: false, error: "Player not found" });
+    if (!key) {
+        return { success: false, error: "Player not found" };
     }
 
-    delete data[player];
-
+    delete data[key];
     save(data);
 
-    res.json({
+    return {
         success: true,
         message: "Player removed",
-        player
-    });
+        player: key
+    };
+}
+
+app.get("/players", (req, res) => {
+    res.json(load());
 });
 
-// --------------------
-// START SERVER
-// --------------------
+app.get("/health", (req, res) => {
+    res.json({ ok: true });
+});
+
+// Discord bot + older clients
+app.post("/update", (req, res) => {
+    const { player, kit, rank } = req.body;
+    res.json(setTier(player, kit, rank));
+});
+
+// Alternate name used in some frontend docs
+app.post("/set", (req, res) => {
+    const { player, kit, rank } = req.body;
+    res.json(setTier(player, kit, rank));
+});
+
+app.post("/remove", (req, res) => {
+    const { player } = req.body;
+    res.json(removeTierPlayer(player));
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on port " + PORT));
